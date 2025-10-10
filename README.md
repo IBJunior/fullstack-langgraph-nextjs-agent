@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/ibjunior-fullstack-langgraph-nextjs-agent-badge.png)](https://mseep.ai/app/ibjunior-fullstack-langgraph-nextjs-agent)
+
 # LangGraph.js AI Agent Template
 
 > **A production-ready Next.js template for building AI agents with LangGraph.js, featuring Model Context Protocol (MCP) integration, human-in-the-loop tool approval, and persistent memory.**
