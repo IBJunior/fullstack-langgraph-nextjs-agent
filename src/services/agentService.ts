@@ -36,7 +36,9 @@ export async function streamResponse(params: {
     approveAllTools: opts?.approveAllTools,
   });
 
-  const iterable = await agent.stream(inputs, {
+  // Type assertion needed for Command union with state update in v1
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const iterable = await agent.stream(inputs as any, {
     streamMode: ["updates"],
     configurable: { thread_id: threadId },
   });
