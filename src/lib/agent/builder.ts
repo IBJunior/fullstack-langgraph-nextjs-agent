@@ -9,12 +9,7 @@ import {
 } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import {
-  DataContentBlock,
-  MessageContentComplex,
-  SystemMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
+import { SystemMessage, ToolMessage, ContentBlock } from "@langchain/core/messages";
 import { ToolCall } from "@langchain/core/messages/tool";
 import { DynamicTool } from "@langchain/core/tools";
 
@@ -83,7 +78,7 @@ export class AgentBuilder {
         },
         {
           action: string;
-          data: string | (MessageContentComplex | DataContentBlock)[];
+          data: string | ContentBlock[];
         }
       >({
         question: "Is this correct?",
