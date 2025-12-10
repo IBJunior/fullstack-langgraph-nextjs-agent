@@ -2,3 +2,11 @@ ignoredBuiltDependencies:
   - "@prisma/client"
   - "@prisma/engines"
   - prisma
+
+overrides:
+  "@modelcontextprotocol/sdk@<1.24.0": ">=1.24.0"
+  body-parser@>=2.2.0 <2.2.1: ">=2.2.1"
+  js-yaml@>=4.0.0 <4.1.1: ">=4.1.1"
+  jws@<3.2.3: ">=3.2.3"
+  mdast-util-to-hast@>=13.0.0 <13.2.1: ">=13.2.1"
+  next@>=15.5.0-canary.0 <15.5.7: ">=15.5.7"
