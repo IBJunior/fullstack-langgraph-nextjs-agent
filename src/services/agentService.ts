@@ -5,6 +5,7 @@ import prisma from "@/lib/database/prisma";
 import { getHistory } from "@/lib/agent/memory";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
+import { processAttachmentsForAI } from "@/lib/storage/content";
 
 /**
  * Returns an async iterable producing incremental AI text chunks for a user text input.
@@ -19,16 +20,47 @@ export async function streamResponse(params: {
   await ensureThread(threadId, userText);
 
   // If allowTool is present, use Command with resume action instead of regular inputs
-  const inputs = opts?.allowTool
-    ? new Command({
-        resume: {
-          action: opts.allowTool === "allow" ? "continue" : "update",
-          data: {},
-        },
-      })
-    : {
-        messages: [new HumanMessage(userText)],
-      };
+  if (opts?.allowTool) {
+    const inputs = new Command({
+      resume: {
+        action: opts.allowTool === "allow" ? "continue" : "update",
+        data: {},
+      },
+    });
+
+    const agent = await ensureAgent({
+      model: opts?.model,
+      tools: opts?.tools,
+      approveAllTools: opts?.approveAllTools,
+    });
+
+    // Type assertion needed for Command union with state update in v1
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const iterable = await agent.stream(inputs as any, {
+      streamMode: ["updates"],
+      configurable: { thread_id: threadId },
+    });
+
+    return generator(iterable);
+  }
+
+  // Build multimodal message with attachments
+  let messageContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+
+  if (opts?.attachments && opts.attachments.length > 0) {
+    // Process attachments and build content array
+    const attachmentContents = await processAttachmentsForAI(opts.attachments);
+
+    // Combine user text with attachment contents
+    messageContent = [{ type: "text", text: userText }, ...attachmentContents];
+  } else {
+    // Simple text message
+    messageContent = userText;
+  }
+
+  const inputs = {
+    messages: [new HumanMessage({ content: messageContent })],
+  };
 
   const agent = await ensureAgent({
     model: opts?.model,
@@ -43,52 +75,56 @@ export async function streamResponse(params: {
     configurable: { thread_id: threadId },
   });
 
-  async function* generator(): AsyncGenerator<MessageResponse, void, unknown> {
-    for await (const chunk of iterable) {
-      if (!chunk) continue;
+  return generator(iterable);
+}
 
-      // Handle tuple format: [type, data]
-      if (Array.isArray(chunk) && chunk.length === 2) {
-        const [chunkType, chunkData] = chunk;
+// Helper generator function to process stream chunks
+async function* generator(
+  iterable: AsyncIterable<unknown>,
+): AsyncGenerator<MessageResponse, void, unknown> {
+  for await (const chunk of iterable) {
+    if (!chunk) continue;
 
+    // Handle tuple format: [type, data]
+    if (Array.isArray(chunk) && chunk.length === 2) {
+      const [chunkType, chunkData] = chunk;
+
+      if (
+        chunkType === "updates" &&
+        chunkData &&
+        typeof chunkData === "object" &&
+        !Array.isArray(chunkData)
+      ) {
+        // Handle updates: ['updates', { agent: { messages: [Array] } }]
         if (
-          chunkType === "updates" &&
-          chunkData &&
-          typeof chunkData === "object" &&
-          !Array.isArray(chunkData)
+          "agent" in chunkData &&
+          chunkData.agent &&
+          typeof chunkData.agent === "object" &&
+          !Array.isArray(chunkData.agent) &&
+          "messages" in chunkData.agent
         ) {
-          // Handle updates: ['updates', { agent: { messages: [Array] } }]
-          if (
-            "agent" in chunkData &&
-            chunkData.agent &&
-            typeof chunkData.agent === "object" &&
-            !Array.isArray(chunkData.agent) &&
-            "messages" in chunkData.agent
-          ) {
-            const messages = Array.isArray(chunkData.agent.messages)
-              ? chunkData.agent.messages
-              : [chunkData.agent.messages];
-            for (const message of messages) {
-              if (!message) continue;
+          const messages = Array.isArray(chunkData.agent.messages)
+            ? chunkData.agent.messages
+            : [chunkData.agent.messages];
+          for (const message of messages) {
+            if (!message) continue;
 
-              const isAIMessage =
-                message?.constructor?.name === "AIMessageChunk" ||
-                message?.constructor?.name === "AIMessage";
+            const isAIMessage =
+              message?.constructor?.name === "AIMessageChunk" ||
+              message?.constructor?.name === "AIMessage";
 
-              if (!isAIMessage) continue;
+            if (!isAIMessage) continue;
 
-              const messageWithTools = message as Record<string, unknown>;
-              const processedMessage = processAIMessage(messageWithTools);
-              if (processedMessage) {
-                yield processedMessage;
-              }
+            const messageWithTools = message as Record<string, unknown>;
+            const processedMessage = processAIMessage(messageWithTools);
+            if (processedMessage) {
+              yield processedMessage;
             }
           }
         }
       }
     }
   }
-  return generator();
 }
 
 // Helper function to process any AI message and return the appropriate MessageResponse

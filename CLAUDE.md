@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Development Commands
 
 ```bash
-# Setup (requires Postgres running)
-docker compose up -d          # Start Postgres on port 5434
+# Setup (requires Postgres and MinIO running)
+docker compose up -d          # Start Postgres (5434) and MinIO (9000/9001)
 pnpm install
 pnpm prisma:generate
 pnpm prisma:migrate
@@ -22,6 +22,10 @@ pnpm format:check             # Check formatting
 pnpm prisma:generate          # After schema changes
 pnpm prisma:migrate           # Create/apply migrations
 pnpm prisma:studio            # Database UI
+
+# File Storage
+# MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+# S3 API: http://localhost:9000
 ```
 
 ## Architecture Overview
@@ -41,6 +45,7 @@ This is a Next.js 15 fullstack AI agent chat application using LangGraph.js with
 2. Agent processes with tools from enabled MCP servers → streams incremental responses
 3. Frontend uses `useChatThread()` hook with React Query for optimistic UI and streaming
 4. Thread persistence via Prisma → Postgres (threads + MCP server configs)
+5. File uploads → `/api/agent/upload` → MinIO (S3-compatible storage) → returns file URLs
 
 ### Key Components Structure
 
@@ -80,6 +85,7 @@ This is a Next.js 15 fullstack AI agent chat application using LangGraph.js with
 - Stream endpoints use `dynamic = "force-dynamic"` and `runtime = "nodejs"`
 - Query params for streaming: `content`, `threadId`, `model`, `allowTool`, `approveAllTools`
 - MCP server CRUD follows REST patterns in `/api/mcp-servers/route.ts`
+- File upload endpoint: `/api/agent/upload` accepts multipart/form-data, returns file metadata
 
 ### Streaming Architecture
 
@@ -87,9 +93,53 @@ This is a Next.js 15 fullstack AI agent chat application using LangGraph.js with
 - Message accumulation: Frontend concatenates text chunks by message ID
 - Tool approval flow uses Command objects with `resume` action
 
+## File Upload & Storage
+
+### MinIO Setup (Development)
+
+- **S3-compatible object storage** runs in Docker alongside Postgres
+- **Bucket**: `uploads` (auto-created on startup, public download access)
+- **Web Console**: http://localhost:9001 (credentials: minioadmin/minioadmin)
+- **S3 API**: http://localhost:9000
+
+### Supported File Types
+
+- **Images**: PNG, JPEG (max 5MB)
+- **Documents**: PDF (max 10MB)
+- **Text**: Markdown, Plain text (max 2MB)
+
+### Production Migration
+
+To switch to AWS S3, Cloudflare R2, or other S3-compatible storage:
+
+1. Update `.env` variables:
+
+   ```bash
+   S3_ENDPOINT=  # Empty for AWS S3, or your provider's endpoint
+   S3_ACCESS_KEY_ID=your_production_key
+   S3_SECRET_ACCESS_KEY=your_production_secret
+   S3_FORCE_PATH_STYLE=false  # false for AWS S3/R2
+   ```
+
+2. No code changes required - AWS SDK handles the rest!
+
+### File Upload Flow
+
+1. User selects files in `MessageInput` component
+2. Files uploaded to MinIO via `/api/agent/upload` endpoint
+3. File metadata (URL, key, name, type, size) stored in message options
+4. Files can be passed to agent for multimodal processing
+
+### Storage Libraries
+
+- `@aws-sdk/client-s3` - S3 client (works with MinIO + AWS S3)
+- `@aws-sdk/lib-storage` - Multipart uploads for large files
+- Storage utilities in `src/lib/storage/`
+
 ## Important Notes
 
 - Always run `pnpm prisma:generate` after schema changes
 - Restart dev server to pick up new MCP server configurations
 - Database runs on port 5434 (not default 5432) to avoid conflicts
+- MinIO runs on ports 9000 (API) and 9001 (Console)
 - Uses pnpm as package manager (see packageManager in package.json)

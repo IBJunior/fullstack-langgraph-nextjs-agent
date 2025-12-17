@@ -168,7 +168,14 @@ export function useChatThread({ threadId }: UseChatThreadOptions): UseChatThread
 
       // Optimistic UI: append the user's message immediately
       const tempId = `temp-${Date.now()}`;
-      const userMessage: MessageResponse = { type: "human", data: { id: tempId, content: text } };
+      const userMessage: MessageResponse = {
+        type: "human",
+        data: {
+          id: tempId,
+          content: text,
+          attachments: opts?.attachments,
+        },
+      };
       queryClient.setQueryData(["messages", threadId], (old: MessageResponse[] = []) => [
         ...old,
         userMessage,

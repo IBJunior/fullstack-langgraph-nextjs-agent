@@ -24,6 +24,7 @@ export async function getMCPServerConfigs(): Promise<Record<string, MCPServerCon
     const servers = await prisma.mCPServer.findMany({
       where: { enabled: true },
     });
+    console.log("Fetched MCP servers from DB:", servers);
 
     const configs: Record<string, MCPServerConfig> = {};
 
@@ -69,6 +70,7 @@ export async function getMCPServerConfigs(): Promise<Record<string, MCPServerCon
 export async function createMCPClient(): Promise<MultiServerMCPClient | null> {
   try {
     const mcpServers = await getMCPServerConfigs();
+    console.log("MCP Server Configs:", mcpServers);
 
     if (Object.keys(mcpServers).length === 0) {
       return null;

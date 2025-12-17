@@ -5,11 +5,20 @@ export interface Thread {
   updatedAt: string;
 }
 
+export interface FileAttachment {
+  url: string;
+  key: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
 export interface MessageOptions {
   model?: string;
   tools?: string[];
   allowTool?: "allow" | "deny";
   approveAllTools?: boolean; // if true, skip tool approval prompts
+  attachments?: FileAttachment[];
 }
 
 export interface MessageRequest {
@@ -41,6 +50,7 @@ export interface FunctionCall {
 }
 
 export interface ContentItem {
+  text: string;
   functionCall?: FunctionCall;
   thoughtSignature?: string;
 }
@@ -70,6 +80,7 @@ export interface ToolMessageData {
 export interface BasicMessageData {
   id: string;
   content: string;
+  attachments?: FileAttachment[];
 }
 
 export interface ToolApprovalCallbacks {

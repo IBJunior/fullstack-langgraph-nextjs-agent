@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { streamResponse } from "@/services/agentService";
-import type { MessageResponse } from "@/types/message";
+import type { MessageResponse, FileAttachment } from "@/types/message";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,12 +19,25 @@ export async function GET(req: NextRequest) {
   const allowTool = searchParams.get("allowTool") as "allow" | "deny" | null;
   const toolsParam = searchParams.get("tools") || "";
   const approveAllTools = searchParams.get("approveAllTools") === "true";
+  const attachmentsParam = searchParams.get("attachments") || "";
+
   const tools = toolsParam
     ? toolsParam
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean)
     : undefined;
+
+  // Parse attachments from JSON
+  let attachments: FileAttachment[] | undefined;
+  if (attachmentsParam) {
+    try {
+      attachments = JSON.parse(attachmentsParam);
+    } catch (error) {
+      console.error("Failed to parse attachments:", error);
+    }
+  }
+
   // Thread existence handled in service.
 
   const encoder = new TextEncoder();
@@ -43,7 +56,7 @@ export async function GET(req: NextRequest) {
           const iterable = await streamResponse({
             threadId,
             userText: userContent,
-            opts: { model, tools, allowTool: allowTool || undefined, approveAllTools },
+            opts: { model, tools, allowTool: allowTool || undefined, approveAllTools, attachments },
           });
           for await (const chunk of iterable) {
             // Only forward AI/tool chunks; ignore human/system

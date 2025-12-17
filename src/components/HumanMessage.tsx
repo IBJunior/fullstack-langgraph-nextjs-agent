@@ -1,5 +1,5 @@
-import type { MessageResponse } from "@/types/message";
-import { UserIcon } from "lucide-react";
+import type { MessageResponse, BasicMessageData, FileAttachment } from "@/types/message";
+import { UserIcon, FileText, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getMessageContent } from "@/services/messageUtils";
 
@@ -7,7 +7,62 @@ interface HumanMessageProps {
   message: MessageResponse;
 }
 
+// Content item types for checkpoint-loaded messages
+interface ImageUrlContentItem {
+  type: "image_url";
+  image_url?: { url: string };
+  file_metadata?: FileAttachment;
+  id?: string;
+  name?: string;
+}
+
+interface TextContentItem {
+  type: "text";
+  text: string;
+  file_metadata?: FileAttachment;
+}
+
+type ContentItem = ImageUrlContentItem | TextContentItem | { type: string };
+
 export const HumanMessage = ({ message }: HumanMessageProps) => {
+  const data = message.data as BasicMessageData;
+  const attachments = [...(data.attachments || [])];
+
+  // Extract attachments from content array (for messages loaded from checkpoint)
+  if (message.data?.content && Array.isArray(message.data.content)) {
+    const contentAttachments = (message.data.content as ContentItem[])
+      .filter(
+        (item): item is ImageUrlContentItem | TextContentItem =>
+          // Images/PDFs with image_url
+          (item.type === "image_url" && "image_url" in item && !!item.image_url) ||
+          // Text files with file_metadata
+          (item.type === "text" && "file_metadata" in item && !!item.file_metadata),
+      )
+      .map((item) => {
+        // Prefer file_metadata if available (new format)
+        if (item.file_metadata) {
+          return item.file_metadata;
+        }
+        // Fallback for old images without file_metadata
+        if (item.type === "image_url") {
+          return {
+            url: item.image_url?.url ?? "",
+            key: item.id ?? "",
+            name: item.name ?? "",
+            type:
+              item.image_url?.url && item.image_url.url.startsWith("data:image/")
+                ? "image/png"
+                : "application/octet-stream",
+            size: 0,
+          } as FileAttachment;
+        }
+        // Should not reach here due to filter, but TypeScript needs this
+        return null;
+      })
+      .filter((att): att is FileAttachment => att !== null);
+    attachments.push(...contentAttachments);
+  }
+
   return (
     <div className="flex justify-end gap-3">
       <div className="max-w-[80%]">
@@ -18,6 +73,41 @@ export const HumanMessage = ({ message }: HumanMessageProps) => {
             "backdrop-blur-sm supports-[backdrop-filter]:bg-gray-300/50",
           )}
         >
+          {/* File Attachments */}
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {attachments.map((attachment) => (
+                <div
+                  key={attachment.key}
+                  className="flex items-center gap-2 rounded-md bg-gray-400/30 px-2 py-1 text-xs"
+                >
+                  {attachment.type.startsWith("image/") ? (
+                    <>
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      <img
+                        src={attachment.url}
+                        alt={attachment.name}
+                        className="my-0 h-20 w-20 rounded object-cover"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-3.5 w-3.5" />
+                      <a
+                        href={attachment.url}
+                        download={attachment.name}
+                        className="max-w-[150px] truncate hover:underline"
+                      >
+                        {attachment.name}
+                      </a>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Message Text */}
           <div className="prose dark:prose-invert max-w-none">
             <p className="my-0">{getMessageContent(message)}</p>
           </div>
