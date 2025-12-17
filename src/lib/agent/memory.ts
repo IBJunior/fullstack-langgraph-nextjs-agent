@@ -10,18 +10,28 @@ export function createMemorySaver(): MemorySaver {
 }
 
 /**
+ * Normalize content to string (LangChain expects string or ContentBlock[] from their types)
+ */
+function normalizeContent(content: string | unknown[] | unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  return JSON.stringify(content);
+}
+
+/**
  * Convert MessageResponse to LangChain BaseMessage
  */
 function messageResponseToBaseMessage(msg: MessageResponse): BaseMessage {
   if (msg.type === "human") {
     return new HumanMessage({
-      content: msg.data.content,
+      content: normalizeContent(msg.data.content),
       id: msg.data.id,
     });
   } else if (msg.type === "ai") {
     const aiData = msg.data as AIMessageData;
     return new AIMessage({
-      content: aiData.content,
+      content: normalizeContent(aiData.content),
       id: aiData.id,
       tool_calls: aiData.tool_calls,
       additional_kwargs: aiData.additional_kwargs,
@@ -29,14 +39,13 @@ function messageResponseToBaseMessage(msg: MessageResponse): BaseMessage {
     });
   } else if (msg.type === "tool") {
     return new ToolMessage({
-      content: msg.data.content,
+      content: normalizeContent(msg.data.content),
       tool_call_id: msg.data.id,
     });
   }
 
   return new HumanMessage({
-    content:
-      typeof msg.data.content === "string" ? msg.data.content : JSON.stringify(msg.data.content),
+    content: normalizeContent(msg.data.content),
     id: msg.data.id,
   });
 }
@@ -71,7 +80,7 @@ export async function hydrateMemoryFromHistory(
     await saver.put({ configurable: { thread_id: threadId } }, checkpoint, {
       source: "update",
       step: -1,
-      writes: null,
+      parents: {},
     });
 
     console.log(`✓ Hydrated ${messages.length} messages for thread ${threadId}`);
