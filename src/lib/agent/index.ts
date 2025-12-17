@@ -1,5 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT as SYSTEM_PROMPT } from "./prompt";
-import { postgresCheckpointer } from "./memory";
+import { createMemorySaver, hydrateMemoryFromHistory } from "./memory";
 import type { DynamicTool, StructuredToolInterface } from "@langchain/core/tools";
 import {
   AgentConfigOptions,
@@ -9,63 +9,56 @@ import {
 } from "./util";
 import { getMCPTools } from "./mcp";
 import { AgentBuilder } from "./builder";
-let setupPromise: Promise<void> | null = null;
+import type { MessageResponse } from "@/types/message";
 
 /**
- * One-time initialization for the Postgres checkpointer.
- * Ensures the underlying table/extension are ready before any agent runs.
- * This is called automatically when creating an agent via `getAgent` or `ensureAgent`.
+ * Create agent with hydrated memory from client history
+ * NO LONGER A SINGLETON - creates fresh instance per request
  */
-async function setupOnce() {
-  if (!setupPromise) {
-    setupPromise = postgresCheckpointer.setup().catch((err) => {
-      // Reset so a future call can retry if initial setup failed.
-      setupPromise = null;
-      console.error("Failed to setup postgres checkpointer:", err);
-      throw err;
-    });
-  }
-  await setupPromise;
-}
-
-/**
- * Create a new agent instance with the given configuration.
- * @param cfg Configuration options for the agent
- * @returns
- */
-async function createAgent(cfg?: AgentConfigOptions) {
-  // Resolve model/provider from cfg or defaults.
+export async function createAgent(
+  cfg?: AgentConfigOptions,
+  threadId?: string,
+  history?: MessageResponse[],
+) {
   const provider = cfg?.provider || DEFAULT_MODEL_PROVIDER;
   const modelName = cfg?.model || DEFAULT_MODEL_NAME;
   const llm = createChatModel({ provider, model: modelName, temperature: 1 });
 
-  // Load MCP tools
   const mcpTools = await getMCPTools();
   const configTools = (cfg?.tools || []) as StructuredToolInterface[];
   const allTools = [...configTools, ...mcpTools] as DynamicTool[];
+
+  // Create fresh MemorySaver for this request
+  const memorySaver = createMemorySaver();
+
+  // HYDRATE with client history
+  if (threadId && history && history.length > 0) {
+    await hydrateMemoryFromHistory(memorySaver, threadId, history);
+  }
 
   const agent = new AgentBuilder({
     llm,
     tools: allTools,
     prompt: cfg?.systemPrompt || SYSTEM_PROMPT,
-    checkpointer: postgresCheckpointer,
+    checkpointer: memorySaver,
     approveAllTools: cfg?.approveAllTools || false,
   }).build();
 
   return agent;
 }
 
-// Public helper if explicit readiness is ever needed elsewhere.
-export async function ensureAgent(cfg?: AgentConfigOptions) {
-  // Ensure checkpointer is ready before returning an agent instance.
-  await setupOnce();
-  return createAgent(cfg);
+export async function ensureAgent(
+  cfg?: AgentConfigOptions,
+  threadId?: string,
+  history?: MessageResponse[],
+) {
+  return createAgent(cfg, threadId, history);
 }
 
-// Named export to explicitly fetch a configured agent.
-export async function getAgent(cfg?: AgentConfigOptions) {
-  return ensureAgent(cfg);
+export async function getAgent(
+  cfg?: AgentConfigOptions,
+  threadId?: string,
+  history?: MessageResponse[],
+) {
+  return ensureAgent(cfg, threadId, history);
 }
-
-// Eagerly create a default agent at module load using env defaults.
-export const defaultAgent = await ensureAgent();

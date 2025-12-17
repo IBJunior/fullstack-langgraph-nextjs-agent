@@ -1,8 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import type { Thread } from "@/types/message";
-import { fetchThreads, createNewThread, deleteThread } from "@/services/chatService";
+import {
+  getThreads,
+  saveThread,
+  deleteThread as deleteThreadStorage,
+} from "@/lib/storage/localStorage";
 import { useThreadContext } from "@/contexts/ThreadContext";
+import { v4 as uuidv4 } from "uuid";
 
 export interface UseThreadsReturn {
   threads: Thread[];
@@ -26,29 +31,36 @@ export function useThreads(): UseThreadsReturn {
     refetch: refetchThreadsQuery,
   } = useQuery<Thread[]>({
     queryKey: ["threads"],
-    queryFn: () => fetchThreads(),
+    queryFn: () => Promise.resolve(getThreads()),
   });
 
   const createThread = useCallback(async () => {
-    // Delegate to backend; optimistic append after create
-    const created = await createNewThread();
-    queryClient.setQueryData(["threads"], (old: Thread[] = []) => [created, ...old]);
-    setActiveThreadId(created.id);
-    return created;
+    const newThread: Thread = {
+      id: uuidv4(),
+      title: "New thread",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveThread(newThread);
+    queryClient.setQueryData(["threads"], (old: Thread[] = []) => [newThread, ...old]);
+    setActiveThreadId(newThread.id);
+
+    return newThread;
   }, [queryClient, setActiveThreadId]);
 
   const deleteThreadCallback = useCallback(
     async (threadId: string) => {
-      await deleteThread(threadId);
-      // Remove from cache optimistically
+      deleteThreadStorage(threadId);
+
       queryClient.setQueryData(["threads"], (old: Thread[] = []) =>
         old.filter((thread) => thread.id !== threadId),
       );
-      // If we're deleting the active thread, clear the active thread
+
       if (activeThreadId === threadId) {
         setActiveThreadId(null);
       }
-      // Clear messages cache for the deleted thread
+
       queryClient.removeQueries({ queryKey: ["messages", threadId] });
     },
     [queryClient, setActiveThreadId, activeThreadId],

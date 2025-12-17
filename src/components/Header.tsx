@@ -21,7 +21,7 @@ export const Header = ({ toggleSidebar }: HeaderProps) => {
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
               <span className="hidden text-xl font-semibold text-gray-800 sm:block">
-                LangGraph & NextJS Agent
+                StackPath AI
               </span>
             </Link>
           </div>

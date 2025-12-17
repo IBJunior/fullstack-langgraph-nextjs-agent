@@ -1,4 +1,8 @@
 import React, { createContext, useContext, useState } from "react";
+import {
+  getActiveThreadId,
+  setActiveThreadId as saveActiveThreadId,
+} from "@/lib/storage/localStorage";
 
 interface ThreadContextType {
   activeThreadId: string | null;
@@ -8,7 +12,15 @@ interface ThreadContextType {
 const ThreadContext = createContext<ThreadContextType | null>(null);
 
 export function ThreadProvider({ children }: { children: React.ReactNode }) {
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  // Initialize from localStorage
+  const [activeThreadId, setActiveThreadIdState] = useState<string | null>(() => {
+    return getActiveThreadId();
+  });
+
+  const setActiveThreadId = (threadId: string | null) => {
+    setActiveThreadIdState(threadId);
+    saveActiveThreadId(threadId);
+  };
 
   return (
     <ThreadContext.Provider value={{ activeThreadId, setActiveThreadId }}>

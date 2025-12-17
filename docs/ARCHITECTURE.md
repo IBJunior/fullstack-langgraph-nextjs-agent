@@ -1,13 +1,15 @@
 # 🏗️ Architecture Documentation
 
-This document provides a comprehensive overview of the LangGraph.js AI Agent Template architecture, designed to help developers understand the system's design patterns and extend functionality.
+This document provides a comprehensive overview of the StackPath AI architecture, designed to help developers understand the system's design patterns and extend functionality.
+
+**Key Innovation**: Excalidraw-style localStorage persistence with server-side memory hydration. No database required.
 
 ## 📋 Table of Contents
 
 1. [System Overview](#system-overview)
 2. [Core Components](#core-components)
-3. [Data Flow](#data-flow)
-4. [Database Schema](#database-schema)
+3. [Data Flow & Memory Hydration](#data-flow--memory-hydration)
+4. [localStorage Persistence](#localstorage-persistence)
 5. [Agent Workflow](#agent-workflow)
 6. [MCP Integration](#mcp-integration)
 7. [Tool Approval Process](#tool-approval-process)
@@ -25,40 +27,45 @@ This document provides a comprehensive overview of the LangGraph.js AI Agent Tem
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
 │  │   Chat UI       │  │   Settings UI   │  │   Thread List   │ │
-│  │   Components    │  │   (MCP Config)  │  │   Sidebar       │ │
+│  │   Components    │  │   (Model Config)│  │   Sidebar       │ │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
 │  │   React Query   │  │   Context API   │  │   Custom Hooks  │ │
 │  │   (State Mgmt)  │  │   (UI State)    │  │   (Data Logic)  │ │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              localStorage (All Persistence)                 ││
+│  │  • Threads metadata  • Messages per thread  • UI state      ││
+│  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                                 │
-                            HTTP/SSE
+                      HTTP/SSE + History Payload
                                 │
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Next.js Server                            │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
 │  │   API Routes    │  │   Agent Service │  │   Chat Service  │ │
-│  │   (REST/SSE)    │  │   (Streaming)   │  │   (Utils)       │ │
+│  │   (SSE Only)    │  │   (Streaming)   │  │   (Utils)       │ │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │  Agent Builder  │  │   MCP Client    │  │   Memory Mgmt   │ │
-│  │  (LangGraph)    │  │   (Tools)       │  │   (History)     │ │
+│  │  Agent Builder  │  │   MCP Client    │  │ Memory Hydration│ │
+│  │  (LangGraph)    │  │   (from JSON)   │  │ (from History)  │ │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
                                 │
-                          Database/Network
+                          Network Only
                                 │
 ┌─────────────────────────────────────────────────────────────────┐
 │                     External Systems                           │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │   PostgreSQL    │  │   OpenAI/Google │  │   MCP Servers   │ │
-│  │   (Persistence) │  │   (LLM APIs)    │  │   (Tools)       │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│  ┌──────────────────────────┐  ┌──────────────────────────────┐│
+│  │   OpenAI/Google APIs     │  │   MCP Servers (stdio/HTTP)   ││
+│  │   (LLM Processing)       │  │   (Dynamic Tools)            ││
+│  └──────────────────────────┘  └──────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,21 +78,21 @@ This document provides a comprehensive overview of the LangGraph.js AI Agent Tem
 - **TypeScript**: Strict mode for type safety
 - **Tailwind CSS**: Utility-first styling
 - **shadcn/ui**: Accessible component library
-- **React Query (TanStack Query)**: Server state management
+- **React Query (TanStack Query)**: Client state management and caching
+- **localStorage**: Browser-based persistence (no database)
 
 #### Backend
 
 - **Node.js**: JavaScript runtime
-- **Prisma ORM**: Type-safe database access
-- **PostgreSQL**: Primary database
 - **Server-Sent Events**: Real-time streaming
+- **No Database**: Stateless server with client-driven memory
 
 #### AI & Tools
 
-- **LangGraph.js**: Agent orchestration framework
+- **LangGraph.js**: Agent orchestration framework with ephemeral MemorySaver
 - **LangChain**: LLM abstraction and tools
 - **OpenAI/Google**: Language model providers
-- **Model Context Protocol**: Dynamic tool integration
+- **Model Context Protocol**: Static tool configuration via JSON
 
 ## 🧩 Core Components
 
@@ -126,11 +133,11 @@ export class AgentBuilder {
 
 ### 2. MCP Integration (`src/lib/agent/mcp.ts`)
 
-Manages dynamic tool loading from Model Context Protocol servers.
+Manages dynamic tool loading from Model Context Protocol servers configured via JSON file.
 
 ```typescript
 export async function createMCPClient(): Promise<MultiServerMCPClient | null> {
-  const mcpServers = await getMCPServerConfigs(); // From database
+  const mcpServers = await getMCPServerConfigs(); // From mcp-config.json
 
   if (Object.keys(mcpServers).length === 0) {
     return null;
@@ -144,40 +151,67 @@ export async function createMCPClient(): Promise<MultiServerMCPClient | null> {
 
   return client;
 }
+
+export async function getMCPServerConfigs(): Promise<Record<string, MCPServerConfig>> {
+  try {
+    const configPath = path.join(process.cwd(), "mcp-config.json");
+    if (!fs.existsSync(configPath)) {
+      return {};
+    }
+    const fileContent = fs.readFileSync(configPath, "utf-8");
+    const config = JSON.parse(fileContent);
+    // Parse and return enabled servers only
+    return config.servers
+      .filter((s: any) => s.enabled)
+      .reduce((acc: Record<string, MCPServerConfig>, server: any) => {
+        // ... configuration parsing logic
+        return acc;
+      }, {});
+  } catch (error) {
+    console.error("Failed to load MCP config:", error);
+    return {};
+  }
+}
 ```
 
 **Key Features:**
 
-- Database-driven MCP server configuration
+- Static JSON configuration (`mcp-config.json` in project root)
 - Support for stdio and HTTP transports
 - Tool name prefixing for conflict prevention
 - Graceful error handling for failed servers
+- No runtime UI for configuration changes
 
 ### 3. Streaming Service (`src/services/agentService.ts`)
 
-Handles real-time streaming of agent responses via Server-Sent Events.
+Handles real-time streaming of agent responses with memory hydration from client history.
 
 ```typescript
 export async function streamResponse(params: {
   threadId: string;
   userText: string;
+  history: MessageResponse[]; // NEW: Client provides history
   opts?: MessageOptions;
 }) {
-  // Ensure thread exists
-  await ensureThread(threadId, userText);
+  const { threadId, userText, history, opts } = params;
 
   // Handle tool approval vs normal input
   const inputs = opts?.allowTool
     ? new Command({ resume: { action: opts.allowTool === "allow" ? "continue" : "update" } })
     : { messages: [new HumanMessage(userText)] };
 
-  const agent = await ensureAgent({
-    model: opts?.model,
-    tools: opts?.tools,
-    approveAllTools: opts?.approveAllTools,
-  });
+  // Create agent WITH HYDRATED MEMORY
+  const agent = await ensureAgent(
+    {
+      model: opts?.model,
+      tools: opts?.tools,
+      approveAllTools: opts?.approveAllTools,
+    },
+    threadId,
+    history, // Pass client history for memory hydration
+  );
 
-  // Stream with checkpointer for persistence
+  // Stream with ephemeral MemorySaver (hydrated with client history)
   const iterable = await agent.stream(inputs, {
     streamMode: ["updates"],
     configurable: { thread_id: threadId },
@@ -230,16 +264,20 @@ export function useChatThread({ threadId }: UseChatThreadOptions) {
 }
 ```
 
-## 🔄 Data Flow
+## 🔄 Data Flow & Memory Hydration
 
-### Message Flow Diagram
+### Message Flow Diagram (Memory Hydration Pattern)
 
 ```
-User Input → Optimistic UI → API Route → Agent Service → LangGraph Agent
-    ↓                                                         ↓
-React Query ←─ SSE Stream ←─ Stream Response ←─ Agent Stream ←─┘
-    ↓
-UI Update
+User Input → Load History from localStorage → Optimistic UI → API Route + History
+    ↓                                                                ↓
+localStorage ← Save Messages ← React Query ← SSE Stream ←─ Agent Service
+                                                                     ↓
+                                                            Memory Hydration
+                                                                     ↓
+                                                            LangGraph Agent
+                                                                     ↓
+                                                            Stream Response
 ```
 
 ### Detailed Flow Steps
@@ -248,102 +286,172 @@ UI Update
    - User types message in `MessageInput` component
    - `useChatThread.sendMessage()` called
 
-2. **Optimistic UI Update**
+2. **Load Client History**
+   - Client loads full conversation history from localStorage
+   - Uses `getMessages(threadId)` from storage utility
+   - History includes all previous messages (human, AI, tool)
+
+3. **Optimistic UI Update**
    - User message immediately added to React Query cache
    - UI updates instantly for responsive feel
+   - React Query cache also updated in localStorage
 
-3. **API Request**
+4. **API Request with History**
    - SSE connection opened to `/api/agent/stream`
-   - Request includes thread ID, message content, and options
+   - Request includes thread ID, message content, **and full conversation history**
+   - History sent as JSON stringified query parameter
 
-4. **Agent Processing**
-   - `streamResponse()` ensures thread exists in database
-   - Agent created with current MCP tools and configuration
-   - LangGraph begins processing with checkpointer for persistence
+5. **Server-Side Memory Hydration**
+   - Server creates fresh MemorySaver instance (ephemeral)
+   - Converts client `MessageResponse[]` to LangChain `BaseMessage[]`
+   - Hydrates MemorySaver checkpoint with client history via `hydrateMemoryFromHistory()`
+   - Agent now has full conversation context without database
 
-5. **Tool Approval (if needed)**
+6. **Agent Processing**
+   - Fresh agent created with hydrated memory
+   - Agent loaded with MCP tools from `mcp-config.json`
+   - LangGraph processes with full context from client history
+
+7. **Tool Approval (if needed)**
    - Agent pauses at tool calls if approval required
    - Tool details sent via SSE to frontend
    - User approves/denies via UI
    - Resume command sent to continue processing
 
-6. **Streaming Response**
+8. **Streaming Response**
    - Agent response streamed chunk-by-chunk via SSE
    - Frontend accumulates chunks by message ID
    - React Query cache updated in real-time
 
-7. **Persistence**
-   - All messages stored in LangGraph checkpointer
-   - Thread metadata updated in PostgreSQL
-   - MCP server configurations persisted
+9. **Client-Side Persistence**
+   - All updated messages saved to localStorage after each chunk
+   - Uses `saveMessages(threadId, messages)` from storage utility
+   - Thread metadata updated in localStorage
+   - No server-side persistence required
 
-## 🗄️ Database Schema
+## 🗄️ localStorage Persistence
 
-### Entity Relationship Diagram
+### Storage Architecture
+
+All application data is stored in browser localStorage with namespace prefix `stackpath_`:
 
 ```
-┌─────────────────┐         ┌─────────────────┐
-│     Thread      │         │   MCPServer     │
-├─────────────────┤         ├─────────────────┤
-│ id: String (PK) │         │ id: String (PK) │
-│ title: String   │         │ name: String    │
-│ createdAt: Date │         │ type: Enum      │
-│ updatedAt: Date │         │ enabled: Bool   │
-└─────────────────┘         │ command: String?│
-                            │ args: Json?     │
-                            │ env: Json?      │
-                            │ url: String?    │
-                            │ headers: Json?  │
-                            │ createdAt: Date │
-                            │ updatedAt: Date │
-                            └─────────────────┘
-
-                    ┌─────────────────────────┐
-                    │   LangGraph Checkpoints │
-                    │   (managed by framework)│
-                    ├─────────────────────────┤
-                    │ thread_id: String       │
-                    │ checkpoint_id: String   │
-                    │                         │
-                    └─────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Browser localStorage                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  stackpath_threads                                          │
+│  ├─ Array<Thread>                                           │
+│  │  ├─ { id, title, createdAt, updatedAt }                 │
+│  │  ├─ { id, title, createdAt, updatedAt }                 │
+│  │  └─ ...                                                  │
+│                                                             │
+│  stackpath_messages_{threadId}                              │
+│  ├─ Array<MessageResponse>                                  │
+│  │  ├─ { type: "human", data: { id, content } }            │
+│  │  ├─ { type: "ai", data: { id, content, tool_calls } }   │
+│  │  └─ ...                                                  │
+│                                                             │
+│  stackpath_active_thread                                    │
+│  └─ string (current thread ID)                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Schema Details
+### Data Models
 
 #### Thread Model
 
-```prisma
-model Thread {
-  id        String   @id @default(uuid())
-  title     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+```typescript
+interface Thread {
+  id: string; // UUID
+  title: string; // Display name
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
 }
 ```
 
-**Purpose**: Minimal metadata for conversation threads. The actual conversation history is stored in LangGraph checkpoints for efficient state management.
+**Storage Key**: `stackpath_threads`
+**Purpose**: Minimal metadata for conversation threads. Messages stored separately per thread.
 
-#### MCPServer Model
+#### Message Model
 
-```prisma
-model MCPServer {
-  id        String            @id @default(uuid())
-  name      String            @unique
-  type      MCPServerType     // stdio | http
-  enabled   Boolean           @default(true)
-  // For stdio servers
-  command   String?
-  args      Json?
-  env       Json?
-  // For http servers
-  url       String?
-  headers   Json?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+```typescript
+type MessageResponse =
+  | { type: "human"; data: HumanMessageData }
+  | { type: "ai"; data: AIMessageData }
+  | { type: "tool"; data: ToolMessageData }
+  | { type: "error"; data: ErrorMessageData };
+
+interface AIMessageData {
+  id: string;
+  content: string;
+  tool_calls?: ToolCall[];
+  additional_kwargs?: Record<string, unknown>;
+  response_metadata?: Record<string, unknown>;
 }
 ```
 
-**Purpose**: Dynamic configuration of MCP servers. Supports both stdio (command-line) and HTTP-based servers with flexible JSON configuration.
+**Storage Key**: `stackpath_messages_{threadId}` (separate key per thread)
+**Purpose**: Complete conversation history including tool calls and metadata.
+
+### Storage Utilities (`src/lib/storage/localStorage.ts`)
+
+#### Key Functions
+
+```typescript
+// Thread Management
+export function getThreads(): Thread[];
+export function getThread(threadId: string): Thread | null;
+export function saveThread(thread: Thread): void;
+export function deleteThread(threadId: string): void;
+
+// Message Management
+export function getMessages(threadId: string): MessageResponse[];
+export function saveMessages(threadId: string, messages: MessageResponse[]): void;
+
+// Active Thread
+export function getActiveThreadId(): string | null;
+export function setActiveThreadId(threadId: string | null): void;
+
+// Utilities
+export function getStorageSize(): string;
+export function clearAllData(): void;
+```
+
+#### Error Handling
+
+- **QuotaExceededError**: Gracefully handled with console warnings
+- **SSR Safety**: All functions check for `window` availability
+- **JSON Parse Errors**: Return empty arrays/null on corrupted data
+
+### MCP Configuration (Static)
+
+MCP servers are configured in `mcp-config.json` at project root (not in localStorage):
+
+```json
+{
+  "servers": [
+    {
+      "name": "context7",
+      "enabled": true,
+      "type": "http",
+      "url": "https://mcp.context7.ai",
+      "headers": {}
+    },
+    {
+      "name": "web_fetch",
+      "enabled": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-fetch"],
+      "env": {}
+    }
+  ]
+}
+```
+
+**Purpose**: Static tool configuration loaded by server at runtime. No UI for management.
 
 ## 🤖 Agent Workflow
 
@@ -432,31 +540,33 @@ switch (humanReview.action) {
 ### Server Configuration Flow
 
 ```
-Database MCPServer → getMCPServerConfigs() → MultiServerMCPClient → Agent Tools
+mcp-config.json → getMCPServerConfigs() → MultiServerMCPClient → Agent Tools
 ```
 
 ### Configuration Examples
 
 #### Stdio Server (File System)
 
-```typescript
+```json
 {
-  name: "filesystem",
-  type: "stdio",
-  command: "npx",
-  args: ["@modelcontextprotocol/server-filesystem", "/allowed/path"],
-  env: { "LOG_LEVEL": "info" }
+  "name": "filesystem",
+  "enabled": true,
+  "type": "stdio",
+  "command": "npx",
+  "args": ["@modelcontextprotocol/server-filesystem", "/allowed/path"],
+  "env": { "LOG_LEVEL": "info" }
 }
 ```
 
 #### HTTP Server (Custom API)
 
-```typescript
+```json
 {
-  name: "web-search",
-  type: "http",
-  url: "https://api.example.com/mcp",
-  headers: {
+  "name": "web-search",
+  "enabled": true,
+  "type": "http",
+  "url": "https://api.example.com/mcp",
+  "headers": {
     "Authorization": "Bearer token",
     "Content-Type": "application/json"
   }
@@ -465,11 +575,21 @@ Database MCPServer → getMCPServerConfigs() → MultiServerMCPClient → Agent 
 
 ### Tool Loading Process
 
-1. **Database Query**: Fetch enabled MCP servers
-2. **Client Creation**: Initialize MultiServerMCPClient
-3. **Tool Discovery**: Get available tools from each server
-4. **Name Prefixing**: Add server name prefix to prevent conflicts
-5. **Agent Binding**: Bind tools to language model
+1. **Load JSON Config**: Read `mcp-config.json` from project root
+2. **Filter Enabled Servers**: Only process servers with `enabled: true`
+3. **Client Creation**: Initialize MultiServerMCPClient with configurations
+4. **Tool Discovery**: Get available tools from each server
+5. **Name Prefixing**: Add server name prefix to prevent conflicts
+6. **Agent Binding**: Bind tools to language model
+
+### Updating MCP Configuration
+
+To add or modify MCP servers:
+
+1. Edit `mcp-config.json` in project root
+2. Add/remove/modify server configurations
+3. Restart development server to pick up changes
+4. No database migrations or UI management needed
 
 ## ✅ Tool Approval Process
 
@@ -694,25 +814,22 @@ stream.addEventListener("error", async (ev: Event) => {
 
 ### Backend Optimizations
 
-#### 1. Database Indexing
+#### 1. Stateless Server Design
 
-```sql
--- Thread lookup optimization
-CREATE INDEX idx_thread_updated_at ON "Thread" ("updatedAt" DESC);
+- **No Database Queries**: Server reads MCP config from JSON file once at startup
+- **Fresh Agent Per Request**: No singleton pattern reduces memory footprint
+- **Ephemeral Memory**: MemorySaver instances garbage collected after response
 
--- MCP server query optimization
-CREATE INDEX idx_mcpserver_enabled ON "MCPServer" ("enabled") WHERE enabled = true;
-```
+#### 2. MCP Client Caching
 
-#### 2. Connection Pooling
-
-- **Database**: Prisma connection pooling
-- **MCP Servers**: Reuse client connections
+- **Reuse Connections**: MCP clients reused across requests when possible
+- **Lazy Loading**: Tools discovered only when agent is created
 
 #### 3. Streaming Efficiency
 
 - **Chunking**: Optimal chunk sizes for SSE
 - **Backpressure**: Handle slow clients gracefully
+- **Memory Hydration**: Efficient conversion from client format to LangChain format
 
 ### Memory Management
 
@@ -731,10 +848,11 @@ useEffect(
 );
 ```
 
-#### 2. LangGraph Checkpointing
+#### 2. Client-Side Storage Cleanup
 
-- **Automatic**: Old checkpoints cleaned by framework
-- **Configuration**: Retention policies via checkpointer settings
+- **Manual**: Users can clear localStorage via browser settings or app UI
+- **Storage Monitoring**: `getStorageSize()` utility provides storage usage info
+- **Quota Management**: QuotaExceededError handled gracefully
 
 ## 📊 Monitoring & Observability
 
@@ -764,33 +882,72 @@ logger.info("Agent processing started", {
 
 ### Health Checks
 
-#### 1. Database Connectivity
-
-```typescript
-export async function healthCheck() {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return { status: "healthy", database: "connected" };
-  } catch (error) {
-    return { status: "unhealthy", database: "disconnected", error };
-  }
-}
-```
-
-#### 2. MCP Server Status
+#### 1. MCP Server Status
 
 ```typescript
 export async function checkMCPServers() {
-  const servers = await prisma.mCPServer.findMany({ where: { enabled: true } });
-  const statuses = await Promise.allSettled(servers.map((server) => testMCPConnection(server)));
+  const config = await getMCPServerConfigs(); // From mcp-config.json
+  const servers = Object.keys(config);
+  const statuses = await Promise.allSettled(
+    servers.map((serverName) => testMCPConnection(config[serverName])),
+  );
   return statuses.map((status, i) => ({
-    server: servers[i].name,
+    server: servers[i],
     status: status.status,
     error: status.status === "rejected" ? status.reason : null,
   }));
 }
 ```
 
+#### 2. Client Storage Health
+
+```typescript
+export function checkLocalStorageHealth() {
+  try {
+    const storageSize = getStorageSize();
+    const threads = getThreads();
+    return {
+      status: "healthy",
+      storageSize,
+      threadCount: threads.length,
+    };
+  } catch (error) {
+    return {
+      status: "unhealthy",
+      error: error.message,
+    };
+  }
+}
+```
+
 ---
 
-This architecture is designed for scalability, maintainability, and extensibility. The modular design allows for easy addition of new features while maintaining clean separation of concerns. The comprehensive error handling and performance optimizations ensure a robust production-ready system.
+## 🎯 Architecture Benefits
+
+### Simplicity
+
+- **No Database Setup**: Zero infrastructure required for development or deployment
+- **Stateless Server**: Easier horizontal scaling and serverless deployment
+- **Client-Driven State**: Browser localStorage provides reliable persistence
+
+### Performance
+
+- **No Database Queries**: Eliminates database latency from request path
+- **Fresh Agent Per Request**: No stale state or singleton issues
+- **Memory Efficiency**: Ephemeral MemorySaver instances garbage collected after use
+
+### Developer Experience
+
+- **Quick Setup**: `pnpm install && pnpm dev` - no Docker or database configuration
+- **Simple Debugging**: All state visible in browser DevTools
+- **Easy Configuration**: MCP servers configured via simple JSON file
+
+### Scalability
+
+- **Horizontal Scaling**: Stateless servers can scale infinitely
+- **Serverless Ready**: Deploy to Vercel, Netlify, or any edge platform
+- **No Database Bottleneck**: Client storage eliminates shared database contention
+
+---
+
+This architecture is designed for simplicity, maintainability, and extensibility. The Excalidraw-style client-side persistence with server-side memory hydration provides a unique approach that eliminates database complexity while maintaining full conversational context. The modular design allows for easy addition of new features while maintaining clean separation of concerns.

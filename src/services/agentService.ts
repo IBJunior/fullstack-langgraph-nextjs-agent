@@ -1,22 +1,20 @@
 import { ensureAgent } from "@/lib/agent";
-import { ensureThread } from "@/lib/thread";
 import type { MessageOptions, MessageResponse, ToolCall } from "@/types/message";
-import prisma from "@/lib/database/prisma";
-import { getHistory } from "@/lib/agent/memory";
-import { BaseMessage, HumanMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
 
 /**
- * Returns an async iterable producing incremental AI text chunks for a user text input.
- * Thread is ensured before streaming. The consumer (route) can package into SSE or any protocol.
+ * Stream AI responses with memory hydrated from client history
  */
 export async function streamResponse(params: {
   threadId: string;
   userText: string;
+  history: MessageResponse[]; // NEW: client provides history
   opts?: MessageOptions;
 }) {
-  const { threadId, userText, opts } = params;
-  await ensureThread(threadId, userText);
+  const { threadId, userText, history, opts } = params;
+
+  // No longer need ensureThread - threads are client-side only
 
   // If allowTool is present, use Command with resume action instead of regular inputs
   const inputs = opts?.allowTool
@@ -30,11 +28,16 @@ export async function streamResponse(params: {
         messages: [new HumanMessage(userText)],
       };
 
-  const agent = await ensureAgent({
-    model: opts?.model,
-    tools: opts?.tools,
-    approveAllTools: opts?.approveAllTools,
-  });
+  // Create agent WITH HYDRATED MEMORY
+  const agent = await ensureAgent(
+    {
+      model: opts?.model,
+      tools: opts?.tools,
+      approveAllTools: opts?.approveAllTools,
+    },
+    threadId,
+    history, // Pass client history for memory hydration
+  );
 
   // Type assertion needed for Command union with state update in v1
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -134,17 +137,4 @@ function processAIMessage(message: Record<string, unknown>): MessageResponse | n
     }
   }
   return null;
-}
-
-/** Fetch prior messages for a thread from the LangGraph checkpoint/memory system. */
-export async function fetchThreadHistory(threadId: string): Promise<MessageResponse[]> {
-  const thread = await prisma.thread.findUnique({ where: { id: threadId } });
-  if (!thread) return [];
-  try {
-    const history = await getHistory(threadId);
-    return history.map((msg: BaseMessage) => msg.toDict() as MessageResponse);
-  } catch (e) {
-    console.error("fetchThreadHistory error", e);
-    return [];
-  }
 }

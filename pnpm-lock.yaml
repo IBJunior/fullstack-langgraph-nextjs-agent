@@ -30,18 +30,12 @@ importers:
       "@langchain/langgraph":
         specifier: ^1.0.2
         version: 1.0.2(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.25.0(zod@3.25.76))(zod@3.25.76)
-      "@langchain/langgraph-checkpoint-postgres":
-        specifier: ^1.0.0
-        version: 1.0.0(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))(@langchain/langgraph-checkpoint@1.0.0(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76))))
       "@langchain/mcp-adapters":
         specifier: ^1.0.0
         version: 1.0.0(@cfworker/json-schema@4.1.1)(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))(@langchain/langgraph@1.0.2(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.25.0(zod@3.25.76))(zod@3.25.76))
       "@langchain/openai":
         specifier: ^1.1.2
         version: 1.1.2(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
-      "@prisma/client":
-        specifier: ^6.16.2
-        version: 6.19.0(prisma@6.19.0(typescript@5.9.3))(typescript@5.9.3)
       "@radix-ui/react-scroll-area":
         specifier: ^1.2.10
         version: 1.2.10(@types/react-dom@19.2.3(@types/react@19.2.6))(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -75,9 +69,6 @@ importers:
       next:
         specifier: 15.5.7
         version: 15.5.7(@playwright/test@1.55.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      pg:
-        specifier: ^8.16.3
-        version: 8.16.3
       react:
         specifier: ^19.1.1
         version: 19.2.0
@@ -956,16 +947,6 @@ packages:
     peerDependencies:
       "@langchain/core": 1.0.6
 
-  "@langchain/langgraph-checkpoint-postgres@1.0.0":
-    resolution:
-      {
-        integrity: sha512-oTHCbQ9N1Zki2J0B/ulq9g/t2DRPePeQqTTJQdMYkdhpHEuWBbEPhpybSTbtXHD/6iT/UImBkUaum+nmPCIJZw==,
-      }
-    engines: { node: ">=18" }
-    peerDependencies:
-      "@langchain/core": ^1.0.1
-      "@langchain/langgraph-checkpoint": ^1.0.0
-
   "@langchain/langgraph-checkpoint@1.0.0":
     resolution:
       {
@@ -1172,21 +1153,6 @@ packages:
       }
     engines: { node: ">=18" }
     hasBin: true
-
-  "@prisma/client@6.19.0":
-    resolution:
-      {
-        integrity: sha512-QXFT+N/bva/QI2qoXmjBzL7D6aliPffIwP+81AdTGq0FXDoLxLkWivGMawG8iM5B9BKfxLIXxfWWAF6wbuJU6g==,
-      }
-    engines: { node: ">=18.18" }
-    peerDependencies:
-      prisma: "*"
-      typescript: ">=5.1.0"
-    peerDependenciesMeta:
-      prisma:
-        optional: true
-      typescript:
-        optional: true
 
   "@prisma/config@6.19.0":
     resolution:
@@ -6762,14 +6728,6 @@ packages:
       }
     engines: { node: ">=10" }
 
-  zod-to-json-schema@3.24.6:
-    resolution:
-      {
-        integrity: sha512-h/z3PKvcTcTetyjl1fkj79MHNEjm+HpD6NXheWjzOekY7kV+lwDYnHw+ivHkijnCSMz1yJaWBD9vu/Fcmk+vEg==,
-      }
-    peerDependencies:
-      zod: ^3.24.1
-
   zod-to-json-schema@3.25.0:
     resolution:
       {
@@ -6829,7 +6787,7 @@ snapshots:
       openai: 6.9.1(ws@8.18.3)(zod@3.25.76)
       ws: 8.18.3
       zod: 3.25.76
-      zod-to-json-schema: 3.24.6(zod@3.25.76)
+      zod-to-json-schema: 3.25.0(zod@3.25.76)
     transitivePeerDependencies:
       - bufferutil
       - encoding
@@ -7110,14 +7068,6 @@ snapshots:
       "@langchain/core": 1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76))
       uuid: 11.1.0
 
-  "@langchain/langgraph-checkpoint-postgres@1.0.0(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))(@langchain/langgraph-checkpoint@1.0.0(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76))))":
-    dependencies:
-      "@langchain/core": 1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76))
-      "@langchain/langgraph-checkpoint": 1.0.0(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))
-      pg: 8.16.3
-    transitivePeerDependencies:
-      - pg-native
-
   "@langchain/langgraph-checkpoint@1.0.0(@langchain/core@1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76)))":
     dependencies:
       "@langchain/core": 1.0.6(openai@6.9.1(ws@8.18.3)(zod@3.25.76))
@@ -7248,11 +7198,6 @@ snapshots:
   "@playwright/test@1.55.1":
     dependencies:
       playwright: 1.55.1
-
-  "@prisma/client@6.19.0(prisma@6.19.0(typescript@5.9.3))(typescript@5.9.3)":
-    optionalDependencies:
-      prisma: 6.19.0(typescript@5.9.3)
-      typescript: 5.9.3
 
   "@prisma/config@6.19.0":
     dependencies:
@@ -9033,7 +8978,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.2
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.12.2(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.12.2)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -10072,15 +10017,19 @@ snapshots:
   pg-cloudflare@1.2.7:
     optional: true
 
-  pg-connection-string@2.9.1: {}
+  pg-connection-string@2.9.1:
+    optional: true
 
-  pg-int8@1.0.1: {}
+  pg-int8@1.0.1:
+    optional: true
 
   pg-pool@3.10.1(pg@8.16.3):
     dependencies:
       pg: 8.16.3
+    optional: true
 
-  pg-protocol@1.10.3: {}
+  pg-protocol@1.10.3:
+    optional: true
 
   pg-types@2.2.0:
     dependencies:
@@ -10089,6 +10038,7 @@ snapshots:
       postgres-bytea: 1.0.0
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
+    optional: true
 
   pg@8.16.3:
     dependencies:
@@ -10099,10 +10049,12 @@ snapshots:
       pgpass: 1.0.5
     optionalDependencies:
       pg-cloudflare: 1.2.7
+    optional: true
 
   pgpass@1.0.5:
     dependencies:
       split2: 4.2.0
+    optional: true
 
   picocolors@1.1.1: {}
 
@@ -10147,15 +10099,19 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postgres-array@2.0.0: {}
+  postgres-array@2.0.0:
+    optional: true
 
-  postgres-bytea@1.0.0: {}
+  postgres-bytea@1.0.0:
+    optional: true
 
-  postgres-date@1.0.7: {}
+  postgres-date@1.0.7:
+    optional: true
 
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
+    optional: true
 
   prelude-ls@1.2.1: {}
 
@@ -10469,7 +10425,7 @@ snapshots:
       onetime: 5.1.2
       signal-exit: 3.0.7
 
-  retry-axios@2.6.0(axios@1.12.2(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.12.2):
     dependencies:
       axios: 1.12.2(debug@4.4.3)
 
@@ -10648,7 +10604,8 @@ snapshots:
 
   space-separated-tokens@2.0.2: {}
 
-  split2@4.2.0: {}
+  split2@4.2.0:
+    optional: true
 
   sqlstring@2.3.3:
     optional: true
@@ -11063,15 +11020,12 @@ snapshots:
 
   ws@8.18.3: {}
 
-  xtend@4.0.2: {}
+  xtend@4.0.2:
+    optional: true
 
   yaml@2.8.1: {}
 
   yocto-queue@0.1.0: {}
-
-  zod-to-json-schema@3.24.6(zod@3.25.76):
-    dependencies:
-      zod: 3.25.76
 
   zod-to-json-schema@3.25.0(zod@3.25.76):
     dependencies:

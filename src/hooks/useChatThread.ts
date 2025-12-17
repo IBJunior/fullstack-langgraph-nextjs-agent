@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MessageOptions, MessageResponse, AIMessageData } from "@/types/message";
-import { createMessageStream, fetchMessageHistory } from "@/services/chatService";
+import { createMessageStream } from "@/services/chatService";
+import { getMessages, saveMessages } from "@/lib/storage/localStorage";
 
 interface UseChatThreadOptions {
   threadId: string | null;
@@ -33,7 +34,7 @@ export function useChatThread({ threadId }: UseChatThreadOptions): UseChatThread
   } = useQuery<MessageResponse[]>({
     queryKey: ["messages", threadId],
     enabled: !!threadId,
-    queryFn: () => (threadId ? fetchMessageHistory(threadId) : Promise.resolve([])),
+    queryFn: () => (threadId ? Promise.resolve(getMessages(threadId)) : Promise.resolve([])),
   });
 
   // Ensure we fetch once the threadId becomes available (guards initial undefined cases)
@@ -59,8 +60,12 @@ export function useChatThread({ threadId }: UseChatThreadOptions): UseChatThread
       }
 
       try {
-        // Open SSE stream to generate the assistant response
-        const stream = createMessageStream(threadId, text, opts);
+        // Get current messages from React Query cache (includes optimistic updates)
+        const currentMessages =
+          queryClient.getQueryData<MessageResponse[]>(["messages", threadId]) || [];
+
+        // Open SSE stream WITH HISTORY
+        const stream = createMessageStream(threadId, text, currentMessages, opts);
         streamRef.current = stream;
 
         stream.onmessage = (event: MessageEvent) => {
@@ -74,10 +79,11 @@ export function useChatThread({ threadId }: UseChatThreadOptions): UseChatThread
             // First chunk for this response id: create a new message entry
             if (!currentMessageRef.current || currentMessageRef.current.data.id !== data.id) {
               currentMessageRef.current = messageResponse;
-              queryClient.setQueryData(["messages", threadId], (old: MessageResponse[] = []) => [
-                ...old,
-                currentMessageRef.current!,
-              ]);
+              queryClient.setQueryData(["messages", threadId], (old: MessageResponse[] = []) => {
+                const updated = [...old, currentMessageRef.current!];
+                saveMessages(threadId, updated); // SAVE TO LOCALSTORAGE
+                return updated;
+              });
             } else {
               // Subsequent chunks: append content if it's a string, otherwise replace
               const currentData = currentMessageRef.current.data as AIMessageData;
@@ -106,6 +112,7 @@ export function useChatThread({ threadId }: UseChatThreadOptions): UseChatThread
                 const clone = [...old];
                 // Replace only the updated message entry with the latest accumulated content
                 clone[idx] = currentMessageRef.current!;
+                saveMessages(threadId, clone); // SAVE TO LOCALSTORAGE
                 return clone;
               });
             }
@@ -139,10 +146,11 @@ export function useChatThread({ threadId }: UseChatThreadOptions): UseChatThread
               type: "error",
               data: { id: `err-${Date.now()}`, content: `⚠️ ${message}` },
             };
-            queryClient.setQueryData(["messages", threadId], (old: MessageResponse[] = []) => [
-              ...old,
-              errorMsg,
-            ]);
+            queryClient.setQueryData(["messages", threadId], (old: MessageResponse[] = []) => {
+              const updated = [...old, errorMsg];
+              saveMessages(threadId, updated); // SAVE TO LOCALSTORAGE
+              return updated;
+            });
           } finally {
             // Always clean up the stream and flags on error
             setIsSending(false);
@@ -169,12 +177,13 @@ export function useChatThread({ threadId }: UseChatThreadOptions): UseChatThread
       // Optimistic UI: append the user's message immediately
       const tempId = `temp-${Date.now()}`;
       const userMessage: MessageResponse = { type: "human", data: { id: tempId, content: text } };
-      queryClient.setQueryData(["messages", threadId], (old: MessageResponse[] = []) => [
-        ...old,
-        userMessage,
-      ]);
+      queryClient.setQueryData(["messages", threadId], (old: MessageResponse[] = []) => {
+        const updated = [...old, userMessage];
+        saveMessages(threadId, updated); // Save immediately to localStorage
+        return updated;
+      });
 
-      // Handle the streaming response
+      // Handle the streaming response (history is read from cache in handleStreamResponse)
       await handleStreamResponse({ threadId, text, opts });
     },
     [threadId, queryClient, handleStreamResponse],

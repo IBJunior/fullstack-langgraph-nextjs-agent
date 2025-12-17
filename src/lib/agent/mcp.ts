@@ -1,5 +1,6 @@
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
-import prisma from "@/lib/database/prisma";
+import fs from "fs";
+import path from "path";
 
 interface StdioMCPServerConfig {
   transport: "stdio";
@@ -17,17 +18,31 @@ interface HttpMCPServerConfig {
 type MCPServerConfig = StdioMCPServerConfig | HttpMCPServerConfig;
 
 /**
- * Fetches enabled MCP servers from the database and formats them for MultiServerMCPClient
+ * Loads enabled MCP servers from mcp-config.json and formats them for MultiServerMCPClient
  */
 export async function getMCPServerConfigs(): Promise<Record<string, MCPServerConfig>> {
   try {
-    const servers = await prisma.mCPServer.findMany({
-      where: { enabled: true },
-    });
+    const configPath = path.join(process.cwd(), "mcp-config.json");
+
+    if (!fs.existsSync(configPath)) {
+      console.warn("mcp-config.json not found, no MCP servers will be loaded");
+      return {};
+    }
+
+    const fileContent = fs.readFileSync(configPath, "utf-8");
+    const config = JSON.parse(fileContent);
+
+    if (!config.servers || !Array.isArray(config.servers)) {
+      console.error("Invalid mcp-config.json structure: servers array not found");
+      return {};
+    }
 
     const configs: Record<string, MCPServerConfig> = {};
 
-    for (const server of servers) {
+    for (const server of config.servers) {
+      // Skip disabled servers
+      if (!server.enabled) continue;
+
       if (server.type === "stdio" && server.command) {
         const config: StdioMCPServerConfig = {
           transport: "stdio",
@@ -35,7 +50,9 @@ export async function getMCPServerConfigs(): Promise<Record<string, MCPServerCon
         };
 
         if (server.args && Array.isArray(server.args)) {
-          config.args = server.args.filter((arg): arg is string => typeof arg === "string");
+          config.args = server.args.filter(
+            (arg: unknown): arg is string => typeof arg === "string",
+          );
         }
         if (server.env && typeof server.env === "object" && server.env !== null) {
           config.env = server.env as Record<string, string>;
@@ -56,9 +73,10 @@ export async function getMCPServerConfigs(): Promise<Record<string, MCPServerCon
       }
     }
 
+    console.log(`Loaded ${Object.keys(configs).length} enabled MCP server(s)`);
     return configs;
   } catch (error) {
-    console.error("Failed to fetch MCP server configs:", error);
+    console.error("Failed to load MCP config:", error);
     return {};
   }
 }

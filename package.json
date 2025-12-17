@@ -1,6 +1,6 @@
 {
-  "name": "fullstack-langgraph-nextjs-agent",
-  "description": "A Next.js template for LangGraph.js AI Agents",
+  "name": "stackpath-ai",
+  "description": "AI-powered tech learning roadmaps tailored to your background",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,10 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -20,10 +17,8 @@
     "@langchain/core": "^1.0.6",
     "@langchain/google-genai": "^1.0.3",
     "@langchain/langgraph": "^1.0.2",
-    "@langchain/langgraph-checkpoint-postgres": "^1.0.0",
     "@langchain/mcp-adapters": "^1.0.0",
     "@langchain/openai": "^1.1.2",
-    "@prisma/client": "^6.16.2",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
@@ -35,7 +30,6 @@
     "framer-motion": "^12.23.22",
     "lucide-react": "^0.544.0",
     "next": "15.5.7",
-    "pg": "^8.16.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",

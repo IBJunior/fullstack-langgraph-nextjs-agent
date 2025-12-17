@@ -1,6 +1,5 @@
 import { ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { ModelConfiguration } from "./ModelConfiguration";
-import { useMCPTools } from "@/hooks/useMCPTools";
 
 interface SettingsPanelProps {
   isExpanded: boolean;
@@ -19,7 +18,6 @@ export const SettingsPanel = ({
   model,
   setModel,
 }: SettingsPanelProps) => {
-  const { data: mcpToolsData } = useMCPTools();
   return (
     <div className="border-b border-gray-200 dark:border-gray-700">
       {/* Settings Header */}
@@ -34,16 +32,9 @@ export const SettingsPanel = ({
           <Settings className="h-4 w-4" />
           <span>Settings</span>
           {!isExpanded && (
-            <>
-              <span className="text-xs text-gray-500">
-                {provider} / {model}
-              </span>
-              {(mcpToolsData?.totalCount ?? 0) > 0 && (
-                <span className="text-xs text-gray-500">
-                  - {mcpToolsData?.totalCount ?? 0} tools available
-                </span>
-              )}
-            </>
+            <span className="text-xs text-gray-500">
+              {provider} / {model}
+            </span>
           )}
         </div>
         {isExpanded ? (

@@ -9,7 +9,11 @@ export const runtime = "nodejs";
  * SSE endpoint that streams incremental AI response chunks produced by the LangGraph React agent.
  * Query params:
  *  - content: user message text
- *  - threadId: (currently unused for history; placeholder for future multi-turn support)
+ *  - threadId: thread identifier for conversation context
+ *  - history: JSON stringified array of MessageResponse (from client localStorage)
+ *  - model: optional model override
+ *  - allowTool: "allow" | "deny" for tool approval
+ *  - approveAllTools: boolean for auto-approval
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -19,13 +23,23 @@ export async function GET(req: NextRequest) {
   const allowTool = searchParams.get("allowTool") as "allow" | "deny" | null;
   const toolsParam = searchParams.get("tools") || "";
   const approveAllTools = searchParams.get("approveAllTools") === "true";
+  const historyParam = searchParams.get("history") || "[]"; // NEW
+
   const tools = toolsParam
     ? toolsParam
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean)
     : undefined;
-  // Thread existence handled in service.
+
+  // Parse client history
+  let history: MessageResponse[] = [];
+  try {
+    history = JSON.parse(historyParam);
+  } catch (e) {
+    console.error("Failed to parse history from client:", e);
+    // Continue with empty history rather than failing
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -43,6 +57,7 @@ export async function GET(req: NextRequest) {
           const iterable = await streamResponse({
             threadId,
             userText: userContent,
+            history, // PASS CLIENT HISTORY
             opts: { model, tools, allowTool: allowTool || undefined, approveAllTools },
           });
           for await (const chunk of iterable) {

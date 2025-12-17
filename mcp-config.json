@@ -1,0 +1,19 @@
+{
+  "servers": [
+    {
+      "name": "context7",
+      "enabled": true,
+      "type": "http",
+      "url": "https://mcp.context7.ai",
+      "headers": {}
+    },
+    {
+      "name": "web_fetch",
+      "enabled": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-fetch"],
+      "env": {}
+    }
+  ]
+}
