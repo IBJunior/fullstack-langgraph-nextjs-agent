@@ -83,7 +83,7 @@ export async function hydrateMemoryFromHistory(
       parents: {},
     });
 
-    console.log(`✓ Hydrated ${messages.length} messages for thread ${threadId}`);
+    console.log(`Hydrated ${messages.length} messages for thread ${threadId}`);
   } catch (error) {
     console.error("Failed to hydrate memory:", error);
     // Don't throw - allow agent to continue without history
