@@ -1,25 +1,16 @@
-import type { MessageResponse, BasicMessageData, FileAttachment } from "@/types/message";
+import type {
+  MessageResponse,
+  BasicMessageData,
+  FileAttachment,
+  ImageUrlContentItem,
+  TextContentItem,
+} from "@/types/message";
 import { UserIcon, FileText, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getMessageContent } from "@/services/messageUtils";
 
 interface HumanMessageProps {
   message: MessageResponse;
-}
-
-// Content item types for checkpoint-loaded messages
-interface ImageUrlContentItem {
-  type: "image_url";
-  image_url?: { url: string };
-  file_metadata?: FileAttachment;
-  id?: string;
-  name?: string;
-}
-
-interface TextContentItem {
-  type: "text";
-  text: string;
-  file_metadata?: FileAttachment;
 }
 
 type ContentItem = ImageUrlContentItem | TextContentItem | { type: string };
@@ -39,11 +30,9 @@ export const HumanMessage = ({ message }: HumanMessageProps) => {
           (item.type === "text" && "file_metadata" in item && !!item.file_metadata),
       )
       .map((item) => {
-        // Prefer file_metadata if available (new format)
         if (item.file_metadata) {
           return item.file_metadata;
         }
-        // Should not reach here due to filter, but TypeScript needs this
         return null;
       })
       .filter((att): att is FileAttachment => att !== null);

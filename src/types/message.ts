@@ -99,3 +99,18 @@ export interface MultimodalMessageContent {
   text?: string;
   image_url?: { url: string };
 }
+
+// Content item types for checkpoint-loaded messages
+export interface ImageUrlContentItem {
+  type: "image_url";
+  image_url?: { url: string };
+  file_metadata?: FileAttachment;
+  id?: string;
+  name?: string;
+}
+
+export interface TextContentItem {
+  type: "text";
+  text: string;
+  file_metadata?: FileAttachment;
+}
