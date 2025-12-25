@@ -47,6 +47,10 @@ export function createMessageStream(
   if (opts?.allowTool) params.set("allowTool", opts.allowTool);
   if (opts?.approveAllTools !== undefined)
     params.set("approveAllTools", opts.approveAllTools ? "true" : "false");
+  if (opts?.attachments && opts.attachments.length > 0) {
+    // Serialize attachments as JSON string for query parameter
+    params.set("attachments", JSON.stringify(opts.attachments));
+  }
   return new EventSource(`${getUrl("stream")}?${params}`);
 }
 

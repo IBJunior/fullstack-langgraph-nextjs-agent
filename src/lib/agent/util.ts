@@ -33,4 +33,4 @@ export interface AgentConfigOptions {
 }
 
 export const DEFAULT_MODEL_PROVIDER = "google";
-export const DEFAULT_MODEL_NAME = "gemini-2.5-flash";
+export const DEFAULT_MODEL_NAME = "gemini-3-flash-preview";

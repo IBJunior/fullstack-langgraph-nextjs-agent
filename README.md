@@ -40,6 +40,18 @@ _Complete agent workflow: user input → tool approval → execution → streami
 - Thread-based organization
 - Seamless resume across sessions
 
+### **Multimodal File Uploads**
+
+<div align="center">
+  <img src="docs/images/file-upload.gif" alt="File upload" width="600" />
+  <p><em>Tool approval dialog with detailed parameter inspection</em></p>
+</div>
+
+- Upload images, PDFs, and text files with messages
+- S3-compatible storage (MinIO for development)
+- Automatic file processing for AI consumption
+- Production-ready with AWS S3, Cloudflare R2 support
+
 ### **Real-time Streaming Interface**
 
 - Server-Sent Events (SSE) for live responses
@@ -50,7 +62,7 @@ _Complete agent workflow: user input → tool approval → execution → streami
 ### **Modern Tech Stack**
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
-- **Backend**: Node.js, Prisma ORM, PostgreSQL
+- **Backend**: Node.js, Prisma ORM, PostgreSQL, MinIO/S3
 - **AI**: LangGraph.js, OpenAI/Google models
 - **UI**: shadcn/ui components, Lucide icons
 
@@ -59,7 +71,7 @@ _Complete agent workflow: user input → tool approval → execution → streami
 ### Prerequisites
 
 - Node.js 18+ and pnpm
-- Docker (for PostgreSQL)
+- Docker (for PostgreSQL and MinIO)
 - OpenAI API key or Google AI API key
 
 ### 1. Clone and Install
@@ -90,10 +102,10 @@ GOOGLE_API_KEY="..."
 DEFAULT_MODEL="gpt-4o-mini"  # or "gemini-1.5-flash"
 ```
 
-### 3. Start Database
+### 3. Start Services
 
 ```bash
-docker compose up -d
+docker compose up -d  # Starts PostgreSQL and MinIO
 ```
 
 ### 4. Database Setup
@@ -209,10 +221,10 @@ _MCP server configuration form with example filesystem server setup_
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                 │
                                 ▼
-                       ┌──────────────────┐
-                       │   PostgreSQL     │
-                       │  (Persistence)   │
-                       └──────────────────┘
+                  ┌──────────────────────────────┐
+                  │   PostgreSQL  │  MinIO/S3    │
+                  │  (Persistence)│ (File Store) │
+                  └──────────────────────────────┘
 ```
 
 ### Core Components
@@ -241,6 +253,12 @@ _MCP server configuration form with example filesystem server setup_
 - Stream management and error handling
 - Tool approval user interface
 
+#### File Storage (`src/lib/storage/`)
+
+- S3-compatible storage with MinIO (development) or AWS S3 (production)
+- File validation, upload, and content processing for AI
+- Multimodal message building with base64 conversion
+
 For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Development
@@ -266,12 +284,13 @@ pnpm prisma:studio      # Open Prisma Studio (database UI)
 ```
 src/
 ├── app/                 # Next.js App Router
-│   ├── api/            # API routes
+│   ├── api/            # API routes (stream, upload, mcp-servers)
 │   └── thread/         # Thread-specific pages
 ├── components/         # React components
 ├── hooks/              # Custom React hooks
 ├── lib/                # Core utilities
-│   └── agent/          # Agent-related logic
+│   ├── agent/          # Agent-related logic
+│   └── storage/        # File upload & S3 utilities
 ├── services/           # Business logic
 └── types/              # TypeScript definitions
 
@@ -283,9 +302,10 @@ prisma/
 ### Key Files
 
 - **Agent Configuration**: `src/lib/agent/builder.ts`, `src/lib/agent/mcp.ts`
-- **API Endpoints**: `src/app/api/agent/stream/route.ts`
+- **API Endpoints**: `src/app/api/agent/stream/route.ts`, `src/app/api/agent/upload/route.ts`
+- **File Storage**: `src/lib/storage/` (validation, upload, content processing)
 - **Database Models**: `prisma/schema.prisma`
-- **Main Chat Interface**: `src/components/Thread.tsx`
+- **Main Chat Interface**: `src/components/Thread.tsx`, `src/components/MessageInput.tsx`
 - **Streaming Logic**: `src/hooks/useChatThread.ts`
 
 ## Contributing
