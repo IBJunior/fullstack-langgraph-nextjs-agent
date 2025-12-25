@@ -11,9 +11,10 @@ This document provides a comprehensive overview of the LangGraph.js AI Agent Tem
 5. [Agent Workflow](#agent-workflow)
 6. [MCP Integration](#mcp-integration)
 7. [Tool Approval Process](#tool-approval-process)
-8. [Streaming Architecture](#streaming-architecture)
-9. [Error Handling](#error-handling)
-10. [Performance Considerations](#performance-considerations)
+8. [File Upload & Storage](#file-upload--storage)
+9. [Streaming Architecture](#streaming-architecture)
+10. [Error Handling](#error-handling)
+11. [Performance Considerations](#performance-considerations)
 
 ## 🌐 System Overview
 
@@ -52,14 +53,14 @@ This document provides a comprehensive overview of the LangGraph.js AI Agent Tem
                                 │
                           Database/Network
                                 │
-┌─────────────────────────────────────────────────────────────────┐
-│                     External Systems                           │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │   PostgreSQL    │  │   OpenAI/Google │  │   MCP Servers   │ │
-│  │   (Persistence) │  │   (LLM APIs)    │  │   (Tools)       │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          External Systems                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ PostgreSQL  │  │OpenAI/Google│  │ MCP Servers │  │ MinIO/S3 (Storage)  │ │
+│  │(Persistence)│  │ (LLM APIs)  │  │  (Tools)    │  │ (File Uploads)      │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Technology Stack
@@ -79,6 +80,7 @@ This document provides a comprehensive overview of the LangGraph.js AI Agent Tem
 - **Prisma ORM**: Type-safe database access
 - **PostgreSQL**: Primary database
 - **Server-Sent Events**: Real-time streaming
+- **MinIO/S3**: Object storage for file uploads
 
 #### AI & Tools
 
@@ -470,6 +472,72 @@ Database MCPServer → getMCPServerConfigs() → MultiServerMCPClient → Agent 
 3. **Tool Discovery**: Get available tools from each server
 4. **Name Prefixing**: Add server name prefix to prevent conflicts
 5. **Agent Binding**: Bind tools to language model
+
+## 📁 File Upload & Storage
+
+The application supports multimodal AI conversations through file uploads. Files are stored in S3-compatible storage (MinIO for development) and processed for AI consumption.
+
+### Upload Flow
+
+```
+User → MessageInput → Upload API → MinIO/S3 → File Metadata
+                                        ↓
+Agent Request ← processAttachmentsForAI ← Download & Convert to Base64
+```
+
+### Supported File Types
+
+| Type      | Extensions | Max Size | AI Processing         |
+| --------- | ---------- | -------- | --------------------- |
+| Images    | PNG, JPEG  | 10MB     | Base64 data URL       |
+| Documents | PDF        | 32MB     | Base64 data URL       |
+| Text      | MD, TXT    | 1MB      | UTF-8 text extraction |
+
+### Key Components
+
+#### Upload Endpoint (`src/app/api/agent/upload/route.ts`)
+
+Handles file validation and storage:
+
+- Validates MIME type and file size
+- Handles `application/octet-stream` for text files by extension
+- Uploads to MinIO/S3 with unique keys
+- Returns file metadata (URL, key, name, type, size)
+
+#### Storage Utilities (`src/lib/storage/`)
+
+- **s3-client.ts**: AWS SDK S3 client configuration
+- **upload.ts**: Upload functions with multipart support for large files
+- **validation.ts**: File type and size validation rules
+- **content.ts**: File processing for AI (base64 conversion, text extraction)
+
+#### Multimodal Message Building (`src/services/agentService.ts`)
+
+```typescript
+if (opts?.attachments && opts.attachments.length > 0) {
+  const attachmentContents = await processAttachmentsForAI(opts.attachments);
+  messageContent = [{ type: "text", text: userText }, ...attachmentContents];
+}
+```
+
+### Storage Architecture
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  MessageInput   │────►│  Upload API     │────►│   MinIO/S3      │
+│  (File Select)  │     │  (Validation)   │     │   (Storage)     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  LangChain      │◄────│ processAttach-  │◄────│  Download &     │
+│  HumanMessage   │     │ mentsForAI()    │     │  Base64 Convert │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+### Production Migration
+
+The storage layer uses AWS SDK v3, which works with any S3-compatible service. To switch from MinIO to production storage (AWS S3, Cloudflare R2, etc.), update the environment variables - no code changes required.
 
 ## ✅ Tool Approval Process
 

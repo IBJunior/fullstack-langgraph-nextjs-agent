@@ -50,6 +50,49 @@ pnpm prisma:migrate   # Create new migrations
 - **Message accumulation**: Frontend concatenates text chunks by message ID for smooth UX
 - **Tool approval flow**: Uses Command objects with `resume` action instead of regular inputs
 
+## File Upload & Storage
+
+### MinIO Setup (Development)
+
+- **S3-compatible object storage** runs in Docker alongside Postgres
+- **Bucket**: `uploads` (auto-created on startup, public download access)
+- **Web Console**: http://localhost:9001 (credentials: minioadmin/minioadmin)
+- **S3 API**: http://localhost:9000
+
+### Supported File Types
+
+- **Images**: PNG, JPEG (max 5MB)
+- **Documents**: PDF (max 10MB)
+- **Text**: Markdown, Plain text (max 2MB)
+
+### Production Migration
+
+To switch to AWS S3, Cloudflare R2, or other S3-compatible storage:
+
+1. Update `.env` variables:
+
+   ```bash
+   S3_ENDPOINT=  # Empty for AWS S3, or your provider's endpoint
+   S3_ACCESS_KEY_ID=your_production_key
+   S3_SECRET_ACCESS_KEY=your_production_secret
+   S3_FORCE_PATH_STYLE=false  # false for AWS S3/R2
+   ```
+
+2. No code changes required - AWS SDK handles the rest!
+
+### File Upload Flow
+
+1. User selects files in `MessageInput` component
+2. Files uploaded to MinIO via `/api/agent/upload` endpoint
+3. File metadata (URL, key, name, type, size) stored in message options
+4. Files can be passed to agent for multimodal processing
+
+### Storage Libraries
+
+- `@aws-sdk/client-s3` - S3 client (works with MinIO + AWS S3)
+- `@aws-sdk/lib-storage` - Multipart uploads for large files
+- Storage utilities in `src/lib/storage/`
+
 ### Database Schema Specifics
 
 - `MCPServer` model supports both stdio and http MCP server types with conditional fields
