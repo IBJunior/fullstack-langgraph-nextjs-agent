@@ -50,7 +50,7 @@ export interface FunctionCall {
 }
 
 export interface ContentItem {
-  text: string;
+  text?: string;
   functionCall?: FunctionCall;
   thoughtSignature?: string;
 }
@@ -92,4 +92,10 @@ export interface MessageResponse {
   type: "human" | "ai" | "tool" | "error";
 
   data: BasicMessageData | AIMessageData | ToolMessageData;
+}
+
+export interface MultimodalMessageContent {
+  type: string;
+  text?: string;
+  image_url?: { url: string };
 }

@@ -489,9 +489,9 @@ Agent Request ← processAttachmentsForAI ← Download & Convert to Base64
 
 | Type      | Extensions | Max Size | AI Processing         |
 | --------- | ---------- | -------- | --------------------- |
-| Images    | PNG, JPEG  | 10MB     | Base64 data URL       |
-| Documents | PDF        | 32MB     | Base64 data URL       |
-| Text      | MD, TXT    | 1MB      | UTF-8 text extraction |
+| Images    | PNG, JPEG  | 5MB      | Base64 data URL       |
+| Documents | PDF        | 10MB     | Base64 data URL       |
+| Text      | MD, TXT    | 2MB      | UTF-8 text extraction |
 
 ### Key Components
 

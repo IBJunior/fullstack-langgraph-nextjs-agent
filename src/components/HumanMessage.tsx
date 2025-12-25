@@ -43,19 +43,6 @@ export const HumanMessage = ({ message }: HumanMessageProps) => {
         if (item.file_metadata) {
           return item.file_metadata;
         }
-        // Fallback for old images without file_metadata
-        if (item.type === "image_url") {
-          return {
-            url: item.image_url?.url ?? "",
-            key: item.id ?? "",
-            name: item.name ?? "",
-            type:
-              item.image_url?.url && item.image_url.url.startsWith("data:image/")
-                ? "image/png"
-                : "application/octet-stream",
-            size: 0,
-          } as FileAttachment;
-        }
         // Should not reach here due to filter, but TypeScript needs this
         return null;
       })

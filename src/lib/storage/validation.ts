@@ -5,6 +5,10 @@
 // Allowed file extensions for application/octet-stream
 // (browsers often send text files with this generic MIME type)
 const OCTET_STREAM_ALLOWED_EXTENSIONS = ["md", "markdown", "txt"];
+const MAX_OCTET_STREAM_SIZE = 2 * 1024 * 1024; // 2MB
+
+// Maximum number of attachments allowed per message
+export const MAX_ATTACHMENTS = 3;
 
 export const ALLOWED_MIME_TYPES = {
   // Images
@@ -37,12 +41,11 @@ export function validateFile(file: File): ValidationError | null {
       };
     }
 
-    // Apply size limit for text files (1MB)
-    const maxSize = 1 * 1024 * 1024;
-    if (file.size > maxSize) {
+    // Apply size limit for text files under octet-stream
+    if (file.size > MAX_OCTET_STREAM_SIZE) {
       return {
         field: "size",
-        message: `File size exceeds maximum allowed size of 1MB`,
+        message: `File size exceeds maximum allowed size of ${MAX_OCTET_STREAM_SIZE / (1024 * 1024)}MB for text files`,
       };
     }
 

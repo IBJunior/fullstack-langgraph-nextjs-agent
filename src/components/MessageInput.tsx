@@ -4,6 +4,7 @@ import { ArrowUp, Loader2, Eye, EyeOff, Paperclip, X } from "lucide-react";
 import { MessageOptions, FileAttachment } from "@/types/message";
 import { SettingsPanel } from "./SettingsPanel";
 import { useUISettings } from "@/contexts/UISettingsContext";
+import { MAX_ATTACHMENTS } from "@/lib/storage/validation";
 
 interface MessageInputProps {
   onSendMessage: (message: string, opts?: MessageOptions) => Promise<void>;
@@ -43,10 +44,24 @@ export const MessageInput = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const remainingSlots = Math.max(0, MAX_ATTACHMENTS - attachments.length);
+    if (remainingSlots <= 0) {
+      alert(`You can attach up to ${MAX_ATTACHMENTS} files per message.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setIsUploading(true);
 
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
+      const selectedFiles = Array.from(files).slice(0, remainingSlots);
+      if (selectedFiles.length < files.length) {
+        alert(
+          `Only the first ${remainingSlots} file(s) were selected (max ${MAX_ATTACHMENTS} attachments).`,
+        );
+      }
+
+      const uploadPromises = selectedFiles.map(async (file) => {
         const formData = new FormData();
         formData.append("file", file);
 
@@ -133,7 +148,7 @@ export const MessageInput = ({
                 >
                   <span className="max-w-[200px] truncate">{attachment.name}</span>
                   <span className="text-xs text-gray-500">
-                    ({(attachment.size / 1024).toFixed(0)}KB)
+                    ({attachment.size < 1024 ? "<1KB" : `${(attachment.size / 1024).toFixed(0)}KB`})
                   </span>
                   <button
                     type="button"
@@ -221,7 +236,7 @@ export const MessageInput = ({
                 size="sm"
                 variant="ghost"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading || isUploading}
+                disabled={isLoading || isUploading || attachments.length >= MAX_ATTACHMENTS}
                 className="h-8 w-8 rounded-full p-0"
                 aria-label="Attach file"
               >

@@ -3,6 +3,41 @@ import { Upload } from "@aws-sdk/lib-storage";
 import { s3Client, BUCKET_NAME } from "./s3-client";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+function sanitizeFilenameForHeader(filename: string): string | undefined {
+  // Prevent HTTP header injection (CRLF) and other control characters.
+  // Also strip path separators to avoid confusing download dialogs.
+  const stripped = filename
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .replace(/[\\/]/g, "_")
+    .trim();
+
+  if (!stripped) return undefined;
+
+  // Keep a reasonable upper bound to avoid very large header values.
+  return stripped.slice(0, 180);
+}
+
+function escapeQuotedString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function buildContentDispositionAttachment(originalFilename: string): string | undefined {
+  const safe = sanitizeFilenameForHeader(originalFilename);
+  if (!safe) return undefined;
+
+  // Provide an ASCII-ish fallback for broad compatibility.
+  const fallback = safe.replace(/[^\x20-\x7E]/g, "_");
+  const quotedFallback = escapeQuotedString(fallback || "download");
+
+  // RFC 5987 / 6266 encoding for UTF-8 filenames.
+  const encoded = encodeURIComponent(safe).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+
+  return `attachment; filename="${quotedFallback}"; filename*=UTF-8''${encoded}`;
+}
+
 /**
  * Upload a file to S3/MinIO
  * @param buffer File buffer to upload
@@ -17,15 +52,17 @@ export async function uploadFile(
   contentType: string,
   originalFilename?: string,
 ): Promise<string> {
+  const contentDisposition = originalFilename
+    ? buildContentDispositionAttachment(originalFilename)
+    : undefined;
+
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
     Body: buffer,
     ContentType: contentType,
     // Set Content-Disposition so browser uses original filename when downloading
-    ...(originalFilename && {
-      ContentDisposition: `attachment; filename="${encodeURIComponent(originalFilename)}"`,
-    }),
+    ...(contentDisposition && { ContentDisposition: contentDisposition }),
   });
 
   await s3Client.send(command);
@@ -49,6 +86,10 @@ export async function uploadLargeFile(
   contentType: string,
   originalFilename?: string,
 ): Promise<string> {
+  const contentDisposition = originalFilename
+    ? buildContentDispositionAttachment(originalFilename)
+    : undefined;
+
   const upload = new Upload({
     client: s3Client,
     params: {
@@ -57,9 +98,7 @@ export async function uploadLargeFile(
       Body: buffer,
       ContentType: contentType,
       // Set Content-Disposition so browser uses original filename when downloading
-      ...(originalFilename && {
-        ContentDisposition: `attachment; filename="${encodeURIComponent(originalFilename)}"`,
-      }),
+      ...(contentDisposition && { ContentDisposition: contentDisposition }),
     },
     // Multipart upload configuration
     queueSize: 4, // concurrent uploads

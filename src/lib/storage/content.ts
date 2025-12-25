@@ -124,21 +124,9 @@ export async function processAttachmentsForAI(
           },
         });
       }
-      // Unknown file type - log warning but don't fail
-      else {
-        console.warn(`Unknown file type for attachment: ${attachment.name} (${attachment.type})`);
-        contentItems.push({
-          type: "text",
-          text: `\n[Unsupported file type: ${attachment.name}]`,
-        });
-      }
     } catch (error) {
       console.error(`Failed to process attachment ${attachment.name}:`, error);
-      // Skip failed attachments rather than failing entire request
-      contentItems.push({
-        type: "text",
-        text: `\n[Failed to load file: ${attachment.name}]`,
-      });
+      throw new Error(`Failed to process attachment ${attachment.name}`);
     }
   }
 
